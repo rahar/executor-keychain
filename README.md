@@ -6,6 +6,8 @@
 - `render.js`: renders the 8 sounds offline with Node into `out/`. `compare.sh` builds `cmp.png`, the original spectrograms (`seg/`, cut from the Threads video `post.mp4`) next to the synth.
 - The analysis scripts (`analyze*.py`, `combW.py`, `noise.py`, `bands.py`) run in `.venv` (numpy/scipy).
 
-Open `executor.html` in any modern browser and press the buttons. Source of the original sounds: [this Threads post](https://www.threads.com/share/__ATMgAT0/). The original video and audio are not included here. How this was built, the instruction given and the coding model are in [PROMPT.md](PROMPT.md).
+**Play it live: https://rahar.github.io/executor-keychain/** (MIT licensed, see [LICENSE](LICENSE)).
+
+Or open `executor.html` in any modern browser and press the buttons. Source of the original sounds: [this Threads post](https://www.threads.com/share/__ATMgAT0/). The original video and audio are not included here. How this was built, the instruction given and the coding model are in [PROMPT.md](PROMPT.md).
 
 Measured from the recording: tick K = 32335 Hz (about 129 kHz osc / 4), integer dividers, about 9% oscillator speed-up at each press, decaying over ~0.1 s (battery).
