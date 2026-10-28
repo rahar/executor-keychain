@@ -149,7 +149,11 @@
       if (this.an + ch.length > 512) { this.port.postMessage({ b: this.ab.slice(0, this.an), p: this.ap.slice(0, this.an), st }); this.an = 0; } return true; }
   }
   registerProcessor('exec-proc', ExecProc);`;
-  function send(m) { if (node && node.port) node.port.postMessage(m); else if (core) apply(core, m); }
+  // Messages sent before the engine exists are queued and flushed in order, so a press/release pair
+  // from a fast tap can never be split (a lost release left the key stuck as 'held').
+  const pending = [];
+  function send(m) { if (node && node.port) node.port.postMessage(m); else if (core) apply(core, m); else pending.push(m); }
+  function flush() { const q = pending.splice(0); q.forEach(send); }
   function apply(c, m) { if (m.t === 'press') c.press(m.k); else if (m.t === 'release') c.release(m.k, m.finish); else if (m.t === 'param') { Object.assign(c.p, m.p); c.designLP(); } }
   function feed(b, p, st) { for (let i = 0; i < b.length; i++) { scopeBit[scopeW] = b[i]; scopeP[scopeW] = p[i]; scopeW = (scopeW + 1) & 2047; } state = st; }
   async function init() {
@@ -172,7 +176,7 @@
         sp.onaudioprocess = (e) => { const ch = e.outputBuffer.getChannelData(0); core.render(ch, ch.length, sb, spp); feed(sb, spp, { prog: core.prog, N: core.N, mode: core.mode, sag: core.sag, K: core.p.K * core.p.trim }); };
         sp.connect(gain);
       }
-      send({ t: 'param', p: params });
+      send({ t: 'param', p: params }); flush();
       if (ctx.state !== 'running') ctx.resume().catch(() => {});
     })();
     return ready;
@@ -202,12 +206,13 @@
 
   // ---------- input ----------
   const down = new Set(); let current = -1;
-  async function press(k) {
+  // Synchronous: state changes in event order, so a release can't overtake its own press.
+  function press(k) {
     document.getElementById('tap').style.display = 'none';
     unlock();
-    await ready;
-    if (ctx.state !== 'running') { const t = document.getElementById('tap'); t.textContent = 'Tap again to enable sound'; t.style.display = ''; } down.add(k); current = k; btns.forEach((b, i) => b.classList.toggle('on', down.has(i)));
+    down.add(k); current = k; btns.forEach((b, i) => b.classList.toggle('on', down.has(i)));
     send({ t: 'press', k });
+    ready.then(() => { if (ctx.state !== 'running') { const t = document.getElementById('tap'); t.textContent = 'Tap again to enable sound'; t.style.display = ''; } });
   }
   function release(k) {
     if (!down.has(k)) return; down.delete(k); btns[k].classList.remove('on');
@@ -216,11 +221,14 @@
   }
   document.getElementById('hold').onchange = (e) => { if (!e.target.checked) return; };
   const ptr = new Map();
-  pad.addEventListener('pointerdown', (e) => { const b = e.target.closest('.btn'); if (!b) return; e.preventDefault(); const k = +b.dataset.k; ptr.set(e.pointerId, k); pad.setPointerCapture && b.releasePointerCapture && b.releasePointerCapture(e.pointerId); press(k); });
+  pad.addEventListener('pointerdown', (e) => { const b = e.target.closest('.btn'); if (!b) return; e.preventDefault(); const k = +b.dataset.k; ptr.set(e.pointerId, k); press(k); try { if (b.hasPointerCapture && b.hasPointerCapture(e.pointerId)) b.releasePointerCapture(e.pointerId); } catch (err) {} });
   const up = (e) => { if (!ptr.has(e.pointerId)) return; const k = ptr.get(e.pointerId); ptr.delete(e.pointerId); release(k); };
   window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   pad.addEventListener('pointerover', (e) => { if (!ptr.has(e.pointerId) || !(e.buttons & 1)) return; const b = e.target.closest('.btn'); if (!b) return; const k = +b.dataset.k, o = ptr.get(e.pointerId); if (k !== o) { ptr.set(e.pointerId, k); release(o); press(k); } });
   pad.addEventListener('contextmenu', (e) => e.preventDefault());
+  // Safety net for mobile: when the last finger lifts, nothing can still be held.
+  document.addEventListener('touchend', (e) => { if (e.touches.length === 0 && (ptr.size || down.size)) { ptr.clear(); [...down].forEach(release); } }, { capture: true, passive: true });
+  document.addEventListener('touchcancel', (e) => { if (e.touches.length === 0) { ptr.clear(); [...down].forEach(release); } }, { capture: true, passive: true });
   window.addEventListener('keydown', (e) => { if (e.repeat || e.metaKey || e.ctrlKey) return; let k = KEYS.indexOf(e.key); if (k < 0 && e.key.toLowerCase() in ALT) k = ALT[e.key.toLowerCase()]; if (k >= 0) { e.preventDefault(); press(k); } });
   window.addEventListener('keyup', (e) => { let k = KEYS.indexOf(e.key); if (k < 0 && e.key.toLowerCase() in ALT) k = ALT[e.key.toLowerCase()]; if (k >= 0) release(k); });
   window.addEventListener('blur', () => { [...down].forEach(release); });
