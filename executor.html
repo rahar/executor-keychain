@@ -288,6 +288,7 @@ class ExecutorCore {
   // ---------- audio ----------
   let ctx = null, node = null, gain = null, sp = null, core = null, ready = null;
   let scopeBit = new Float32Array(2048), scopeP = new Float32Array(2048), scopeW = 0, state = { prog: -1 };
+  window.__execDebug = () => ({ ctx, node, sp, scopeP, state });
   const WORKLET = CORE + `
   class ExecProc extends AudioWorkletProcessor {
     constructor() { super(); this.c = new ExecutorCore(sampleRate); this.sb = new Float32Array(128); this.sp = new Float32Array(128); this.n = 0; this.ab = new Float32Array(512); this.ap = new Float32Array(512); this.an = 0;
@@ -306,6 +307,7 @@ class ExecutorCore {
     if (ready) return ready;
     ready = (async () => {
       ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+      ctx.onstatechange = () => { if (ctx.state === 'running') document.getElementById('tap').style.display = 'none'; };
       gain = ctx.createGain(); gain.gain.value = +document.getElementById('vol').value; gain.connect(ctx.destination);
       try {
         if (!ctx.audioWorklet) throw new Error('no worklet');
@@ -322,18 +324,40 @@ class ExecutorCore {
         sp.connect(gain);
       }
       send({ t: 'param', p: params });
-      if (ctx.state !== 'running') await ctx.resume();
+      if (ctx.state !== 'running') ctx.resume().catch(() => {});
     })();
     return ready;
   }
+  // ---------- iOS / Safari audio unlock ----------
+  // Must run synchronously inside a user gesture (touchend/click count on iOS; pointerdown may not).
+  // audioSession 'playback' (iOS 17+) makes Web Audio ignore the ring/silent switch; older iOS gets a
+  // looping silent <audio> element, which moves the page's audio session to the playback category.
+  let unlocked = false, silentEl = null;
+  function silentWav() {
+    const n = 4000, b = new Uint8Array(44 + n), v = new DataView(b.buffer), s = (o, t) => { for (let i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
+    s(0, 'RIFF'); v.setUint32(4, 36 + n, true); s(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); s(36, 'data'); v.setUint32(40, n, true);
+    b.fill(128, 44); return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+  }
+  function unlock() {
+    try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) {}
+    if (!ctx) init();
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    if (unlocked) return; unlocked = true;
+    try { const s = ctx.createBufferSource(); s.buffer = ctx.createBuffer(1, 1, ctx.sampleRate); s.connect(ctx.destination); s.start(0); } catch (e) {}
+    if (!navigator.audioSession) { try { silentEl = new Audio(silentWav()); silentEl.loop = true; silentEl.setAttribute('playsinline', ''); silentEl.setAttribute('x-webkit-airplay', 'deny'); silentEl.play().catch(() => {}); } catch (e) {} }
+  }
+  ['touchend', 'click', 'keydown'].forEach((t) => document.addEventListener(t, unlock, { capture: true, passive: true }));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && ctx && ctx.state !== 'running' && unlocked) ctx.resume().catch(() => {}); });
   document.getElementById('vol').oninput = (e) => { if (gain) gain.gain.value = +e.target.value; };
 
   // ---------- input ----------
   const down = new Set(); let current = -1;
   async function press(k) {
     document.getElementById('tap').style.display = 'none';
-    if (!ctx) init(); if (ctx && ctx.state !== 'running') ctx.resume();
-    await ready; down.add(k); current = k; btns.forEach((b, i) => b.classList.toggle('on', down.has(i)));
+    unlock();
+    await ready;
+    if (ctx.state !== 'running') { const t = document.getElementById('tap'); t.textContent = 'Tap again to enable sound'; t.style.display = ''; } down.add(k); current = k; btns.forEach((b, i) => b.classList.toggle('on', down.has(i)));
     send({ t: 'press', k });
   }
   function release(k) {
