@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>EXECUTOR – 8-sound keychain (1989) emulator</title>
+<style>
+  :root { --bg:#e9e6ef; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font:14px/1.45 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:radial-gradient(circle at 50% 20%,#fbfaff,#d9d5e2); color:#222; min-height:100vh; }
+  main { max-width:980px; margin:0 auto; padding:18px; display:flex; flex-wrap:wrap; gap:28px; justify-content:center; align-items:flex-start; }
+  .stage { position:relative; width:300px; height:560px; flex:none; user-select:none; -webkit-user-select:none; touch-action:none; }
+  .ring { position:absolute; left:0; top:0; }
+  .body { position:absolute; left:58px; top:70px; width:220px; height:470px; background:linear-gradient(100deg,#2a2a2d 0%,#141416 35%,#0c0c0d 70%,#232326 100%);
+          clip-path:polygon(22% 0,78% 0,100% 9%,100% 100%,0 100%,0 9%); border-radius:0 0 26px 26px; box-shadow:inset 0 0 0 2px #000; }
+  .body::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.07),transparent 30%); pointer-events:none; }
+  .lug { position:absolute; left:148px; top:42px; width:40px; height:40px; border-radius:8px; background:#111; }
+  .grille { position:absolute; left:28px; top:42px; width:164px; height:180px; border-radius:6px;
+            background:repeating-linear-gradient(135deg,#050505 0 7px,#1d1d20 7px 13px); box-shadow:inset 0 0 12px #000; }
+  .grille i { position:absolute; width:12px; height:46px; background:linear-gradient(90deg,#c35e00,#ff9a1f,#c35e00); transform:skewX(-35deg); top:66px; border-radius:2px; opacity:.95; }
+  .pad { position:absolute; left:26px; top:262px; width:168px; height:118px; background:#050505; border-radius:8px; box-shadow:inset 0 0 0 2px #2b2b2b; display:grid; grid-template-columns:repeat(4,1fr); gap:9px; padding:13px 12px; }
+  .btn { border:none; border-radius:4px; cursor:pointer; position:relative; box-shadow:inset 0 -5px 0 rgba(0,0,0,.28),inset 0 3px 0 rgba(255,255,255,.35),0 2px 0 #000; transition:transform .03s; }
+  .btn.on { transform:translateY(2px) scale(.96); box-shadow:inset 0 -2px 0 rgba(0,0,0,.3),inset 0 2px 0 rgba(255,255,255,.25); filter:brightness(1.15); }
+  .logo { position:absolute; left:0; right:0; top:404px; text-align:center; font:italic 900 27px/1 Impact,'Arial Black',sans-serif; letter-spacing:1px;
+          color:#ddd; background:linear-gradient(180deg,#fff 0%,#9aa 45%,#fff 55%,#888 100%); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; -webkit-text-stroke:1px #333; }
+  .logo::after { content:''; display:block; margin:5px auto 0; width:150px; height:3px; background:#d01818; }
+  .led { position:absolute; left:104px; top:236px; width:12px; height:12px; border-radius:50%; background:#300; box-shadow:inset 0 0 3px #000; }
+  .led.on { background:#ff3a2a; box-shadow:0 0 10px #ff2a1a; }
+  .panel { flex:1 1 420px; min-width:300px; max-width:600px; }
+  h1 { font-size:20px; margin:4px 0 2px; } h2 { font-size:15px; margin:18px 0 6px; }
+  .sub { color:#555; margin:0 0 10px; }
+  canvas { width:100%; height:150px; background:#0b0d10; border-radius:8px; display:block; }
+  .now { font:12px/1.4 ui-monospace,Menlo,Consolas,monospace; background:#0b0d10; color:#8fe39a; padding:6px 9px; border-radius:8px; margin-top:6px; min-height:2.9em; white-space:pre; }
+  .grid { display:grid; grid-template-columns:auto 1fr auto; gap:4px 10px; align-items:center; font-size:13px; }
+  .grid input { width:100%; } .grid output { font:12px ui-monospace,Menlo,monospace; min-width:6.5em; text-align:right; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  button.small { font:13px inherit; padding:5px 10px; border-radius:6px; border:1px solid #aaa; background:#fff; cursor:pointer; }
+  table { border-collapse:collapse; font-size:12.5px; width:100%; } td,th { border-bottom:1px solid #ccc; padding:3px 5px; text-align:left; vertical-align:top; }
+  .sw { display:inline-block; width:12px; height:12px; border-radius:2px; vertical-align:-2px; margin-right:4px; }
+  details { margin-top:10px; } summary { cursor:pointer; font-weight:600; }
+  .tap { position:absolute; left:0; right:0; top:46%; text-align:center; color:#fff; font-weight:700; text-shadow:0 1px 4px #000; pointer-events:none; }
+</style>
+</head>
+<body>
+<main>
+  <div class="stage" id="stage">
+    <svg class="ring" width="190" height="130" viewBox="0 0 190 130">
+      <defs><linearGradient id="m" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#8d9196"/><stop offset="1" stop-color="#e6e8ea"/></linearGradient></defs>
+      <circle cx="52" cy="52" r="40" fill="none" stroke="url(#m)" stroke-width="6"/>
+      <circle cx="52" cy="52" r="35" fill="none" stroke="#9aa0a6" stroke-width="1.4"/>
+      <path d="M88 66 q14 10 30 6 q16 -4 30 -2 q12 2 20 12" fill="none" stroke="url(#m)" stroke-width="5" stroke-linecap="round"/>
+      <ellipse cx="168" cy="74" rx="9" ry="6" fill="none" stroke="url(#m)" stroke-width="4"/>
+    </svg>
+    <div class="lug"></div>
+    <div class="body">
+      <div class="grille"><i style="left:62px"></i><i style="left:80px"></i><i style="left:98px"></i></div>
+      <div class="led" id="led"></div>
+      <div class="pad" id="pad"></div>
+      <div class="logo">EXECUTOR</div>
+    </div>
+    <div class="tap" id="tap">tap a button</div>
+  </div>
+
+  <div class="panel">
+    <h1>EXECUTOR – 8-sound keychain (1989)</h1>
+    <p class="sub">Hold a button (or keys <b>1–8</b>). A model of the chip's logic drives a model of the speaker. There are no samples in this file.</p>
+    <canvas id="scope" width="1200" height="300"></canvas>
+    <div class="now" id="now">idle</div>
+    <div class="row">
+      <label><input type="checkbox" id="hold" checked> level-hold (sound runs while held, like the toy)</label>
+      <label>volume <input type="range" id="vol" min="0" max="1" step="0.01" value="0.7"></label>
+      <button class="small" id="reset">reset physics</button>
+    </div>
+    <h2>Physics</h2>
+    <div class="grid" id="knobs"></div>
+
+    <details open><summary>What's inside, and how it was matched</summary>
+      <p>This toy is built around a <b>mask-ROM CMOS "sound effect" chip</b>. In toys like this the die is usually a black epoxy blob (chip-on-board) with no part number. The family it belongs to is documented in Holtek's <a href="http://www.metronix.cz/ht2884.pdf">HT2884 "8-Sound Generator"</a> datasheet: an RC oscillator (typically 128 kHz with a 180 kΩ resistor), a programmable <b>tone divider</b>, a <b>noise (LFSR) generator</b>, a small sequencer ROM, and a <b>1-bit push-pull output</b> (OUT / OUT̄) wired straight across an 8 Ω speaker. The chip has no DAC and no volume envelope: every sound is a sequence of square-wave or noise segments.</p>
+      <p>The numbers come from the clip that went round on Threads. Every tone in it sits at <code>f = 32 335 Hz / N</code> with an integer divider N, and neighbouring steps differ in period by exactly 1/32 335 s. That points to an oscillator at about 129 kHz divided by 4, which agrees with the datasheet's 128 kHz. The tones are <b>1/3-duty pulses</b> (every 3rd harmonic is missing). The noise is a long LFSR clocked at 32 335/4 or 32 335/5 Hz.</p>
+      <table>
+        <tr><th>key</th><th>sound</th><th>what the ROM does</th></tr>
+        <tbody id="progtable"></tbody>
+      </table>
+      <p><b>Physics simulated per sample, at 4× oversampling:</b> a battery with internal resistance and polarisation, so the oscillator runs about 9% fast for the first ~100 ms after a press and then sags (this shows in every sound in the recording). Then the 1-bit bridged drive (±V<sub>DD</sub>) into a voice coil (R = 8 Ω, L = 0.1 mH, Bl = 0.6 T·m), a cone mass–spring–damper (0.15 g, stiffening suspension), a Helmholtz front cavity behind the grille, a rear leak through the case seams, a cone break-up mode, and absorption by the case panel. The resonances were fitted so the spectrum matches the recording within a few dB from 0.5 to 6 kHz.</p>
+      <p>The pitch steps, timings and divider ranges were measured from the recording. Which button makes which sound is my guess, read from the finger positions in the clip.</p>
+    </details>
+  </div>
+</main>
+
+<script id="core" type="text/plain">/*CORE*/</script>
+<script>
+(() => {
+  const CORE = document.getElementById('core').textContent;
+  const COLORS = ['#ff5d3a', '#f6a9c4', '#f7c63c', '#3ccfd8', '#35b955', '#d9e24a', '#a98be8', '#8e1515'];
+  const KEYS = ['1','2','3','4','5','6','7','8'];
+  const ALT = { q:0, w:1, e:2, r:3, a:4, s:5, d:6, f:7 };
+  const DESC = [
+    ['Warble', 'divider swept 25↔58 (1290↔557 Hz), linear in frequency, 120 ms cycle'],
+    ['Bomb', 'whistle: N 28→54 step 1, →66 step 2, 116 ms per step; then 3.9 s of LFSR noise (one-shot)'],
+    ['Two-tone', 'N 64 / 85 (505 / 380 Hz, a fourth apart), 150 ms each'],
+    ['Cannon', 'LFSR noise, clock divider 4 then slowed 5…16, so the boom sinks below the speaker; 0.8 s per shot'],
+    ['Machine gun', 'LFSR bursts 90 ms on / 13 ms off (≈10 rounds/s)'],
+    ['Step laser', 'N 31, 32, 33, 34 (1043→951 Hz), 250 ms each, looping'],
+    ['Siren', 'divider triangle 66↔111 (490↔291 Hz), one count per 3.17 ms, 285 ms cycle'],
+    ['Space gun', '270 ms hiss (LFSR clocked at 16 kHz), then a chirp N 24→44 step 1, →66 step 2, 16.6 ms/step'],
+  ];
+  const pad = document.getElementById('pad'), led = document.getElementById('led'), nowEl = document.getElementById('now');
+  const btns = COLORS.map((c, k) => { const b = document.createElement('button'); b.className = 'btn'; b.style.background = c; b.title = (k + 1) + ': ' + DESC[k][0]; b.dataset.k = k; pad.appendChild(b); return b; });
+  document.getElementById('progtable').innerHTML = DESC.map((d, k) => `<tr><td><span class="sw" style="background:${COLORS[k]}"></span>${k + 1}</td><td>${d[0]}</td><td>${d[1]}</td></tr>`).join('');
+
+  const KNOBS = [
+    ['vbat', 'battery voltage', 2.2, 3.3, 0.01, 'V'],
+    ['trim', 'oscillator R trim (pitch + tempo)', 0.8, 1.25, 0.005, '×'],
+    ['sagAmt', 'battery sag on press', 0, 0.2, 0.005, ''],
+    ['rint', 'cell internal resistance', 0, 20, 0.5, 'Ω'],
+    ['fsSpk', 'cone resonance', 300, 1500, 10, 'Hz'],
+    ['qms', 'cone Q', 0.4, 5, 0.05, ''],
+    ['fh', 'grille cavity resonance', 1500, 4000, 10, 'Hz'],
+    ['qh', 'cavity Q', 1, 12, 0.1, ''],
+    ['portMix', 'cavity vs. direct radiation', 0, 1, 0.01, ''],
+    ['leak', 'rear leak (case seams)', 0, 0.9, 0.01, ''],
+  ];
+  const DEF = {}; let params = {};
+  { const tmp = new (new Function(CORE + '; return ExecutorCore;')())(48000); Object.assign(DEF, tmp.p); }
+  params = Object.assign({}, DEF);
+  const knobs = document.getElementById('knobs');
+  const inputs = {};
+  for (const [k, label, mn, mx, st, u] of KNOBS) {
+    const l = document.createElement('label'); l.textContent = label;
+    const i = document.createElement('input'); i.type = 'range'; i.min = mn; i.max = mx; i.step = st; i.value = DEF[k];
+    const o = document.createElement('output'); const show = () => o.textContent = (+i.value).toFixed(st < 0.1 ? (st < 0.01 ? 3 : 2) : 0) + ' ' + u;
+    show(); i.oninput = () => { show(); params[k] = +i.value; send({ t: 'param', p: { [k]: +i.value } }); };
+    knobs.append(l, i, o); inputs[k] = [i, show];
+  }
+  document.getElementById('reset').onclick = () => { for (const k in inputs) { inputs[k][0].value = DEF[k]; inputs[k][1](); } params = Object.assign({}, DEF); send({ t: 'param', p: DEF }); };
+
+  // ---------- audio ----------
+  let ctx = null, node = null, gain = null, sp = null, core = null, ready = null;
+  let scopeBit = new Float32Array(2048), scopeP = new Float32Array(2048), scopeW = 0, state = { prog: -1 };
+  const WORKLET = CORE + `
+  class ExecProc extends AudioWorkletProcessor {
+    constructor() { super(); this.c = new ExecutorCore(sampleRate); this.sb = new Float32Array(128); this.sp = new Float32Array(128); this.n = 0; this.ab = new Float32Array(512); this.ap = new Float32Array(512); this.an = 0;
+      this.port.onmessage = (e) => { const m = e.data; if (m.t === 'press') this.c.press(m.k); else if (m.t === 'release') this.c.release(m.k, m.finish);
+        else if (m.t === 'param') { Object.assign(this.c.p, m.p); this.c.designLP(); } }; }
+    process(inp, outs) { const o = outs[0]; const ch = o[0]; this.c.render(ch, ch.length, this.sb, this.sp); for (let c = 1; c < o.length; c++) o[c].set(ch);
+      const st = { prog: this.c.prog, N: this.c.N, mode: this.c.mode, sag: this.c.sag, K: this.c.p.K * this.c.p.trim };
+      this.ab.set(this.sb.subarray(0, ch.length), this.an); this.ap.set(this.sp.subarray(0, ch.length), this.an); this.an += ch.length;
+      if (this.an + ch.length > 512) { this.port.postMessage({ b: this.ab.slice(0, this.an), p: this.ap.slice(0, this.an), st }); this.an = 0; } return true; }
+  }
+  registerProcessor('exec-proc', ExecProc);`;
+  function send(m) { if (node && node.port) node.port.postMessage(m); else if (core) apply(core, m); }
+  function apply(c, m) { if (m.t === 'press') c.press(m.k); else if (m.t === 'release') c.release(m.k, m.finish); else if (m.t === 'param') { Object.assign(c.p, m.p); c.designLP(); } }
+  function feed(b, p, st) { for (let i = 0; i < b.length; i++) { scopeBit[scopeW] = b[i]; scopeP[scopeW] = p[i]; scopeW = (scopeW + 1) & 2047; } state = st; }
+  async function init() {
+    if (ready) return ready;
+    ready = (async () => {
+      ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+      gain = ctx.createGain(); gain.gain.value = +document.getElementById('vol').value; gain.connect(ctx.destination);
+      try {
+        if (!ctx.audioWorklet) throw new Error('no worklet');
+        const url = URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' }));
+        await ctx.audioWorklet.addModule(url);
+        node = new AudioWorkletNode(ctx, 'exec-proc', { outputChannelCount: [1] });
+        node.port.onmessage = (e) => feed(e.data.b, e.data.p, e.data.st);
+        node.connect(gain);
+      } catch (err) {
+        console.warn('AudioWorklet unavailable, using ScriptProcessor', err);
+        core = new (new Function(CORE + '; return ExecutorCore;')())(ctx.sampleRate);
+        sp = ctx.createScriptProcessor(512, 0, 1); const sb = new Float32Array(512), spp = new Float32Array(512);
+        sp.onaudioprocess = (e) => { const ch = e.outputBuffer.getChannelData(0); core.render(ch, ch.length, sb, spp); feed(sb, spp, { prog: core.prog, N: core.N, mode: core.mode, sag: core.sag, K: core.p.K * core.p.trim }); };
+        sp.connect(gain);
+      }
+      send({ t: 'param', p: params });
+      if (ctx.state !== 'running') await ctx.resume();
+    })();
+    return ready;
+  }
+  document.getElementById('vol').oninput = (e) => { if (gain) gain.gain.value = +e.target.value; };
+
+  // ---------- input ----------
+  const down = new Set(); let current = -1;
+  async function press(k) {
+    document.getElementById('tap').style.display = 'none';
+    if (!ctx) init(); if (ctx && ctx.state !== 'running') ctx.resume();
+    await ready; down.add(k); current = k; btns.forEach((b, i) => b.classList.toggle('on', down.has(i)));
+    send({ t: 'press', k });
+  }
+  function release(k) {
+    if (!down.has(k)) return; down.delete(k); btns[k].classList.remove('on');
+    const finish = !document.getElementById('hold').checked;   // one-shot mode: let the ROM pass finish
+    if (k === current) { if (down.size && !finish) { const n = [...down].pop(); current = n; send({ t: 'press', k: n }); } else { send({ t: 'release', k, finish }); current = -1; } }
+  }
+  document.getElementById('hold').onchange = (e) => { if (!e.target.checked) return; };
+  const ptr = new Map();
+  pad.addEventListener('pointerdown', (e) => { const b = e.target.closest('.btn'); if (!b) return; e.preventDefault(); const k = +b.dataset.k; ptr.set(e.pointerId, k); pad.setPointerCapture && b.releasePointerCapture && b.releasePointerCapture(e.pointerId); press(k); });
+  const up = (e) => { if (!ptr.has(e.pointerId)) return; const k = ptr.get(e.pointerId); ptr.delete(e.pointerId); release(k); };
+  window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  pad.addEventListener('pointerover', (e) => { if (!ptr.has(e.pointerId) || !(e.buttons & 1)) return; const b = e.target.closest('.btn'); if (!b) return; const k = +b.dataset.k, o = ptr.get(e.pointerId); if (k !== o) { ptr.set(e.pointerId, k); release(o); press(k); } });
+  pad.addEventListener('contextmenu', (e) => e.preventDefault());
+  window.addEventListener('keydown', (e) => { if (e.repeat || e.metaKey || e.ctrlKey) return; let k = KEYS.indexOf(e.key); if (k < 0 && e.key.toLowerCase() in ALT) k = ALT[e.key.toLowerCase()]; if (k >= 0) { e.preventDefault(); press(k); } });
+  window.addEventListener('keyup', (e) => { let k = KEYS.indexOf(e.key); if (k < 0 && e.key.toLowerCase() in ALT) k = ALT[e.key.toLowerCase()]; if (k >= 0) release(k); });
+  window.addEventListener('blur', () => { [...down].forEach(release); });
+
+  // ---------- scope ----------
+  const cv = document.getElementById('scope'), g2 = cv.getContext('2d');
+  function draw() {
+    const W = cv.width, H = cv.height; g2.fillStyle = '#0b0d10'; g2.fillRect(0, 0, W, H);
+    g2.strokeStyle = '#1c2530'; g2.lineWidth = 1; g2.beginPath(); g2.moveTo(0, H * 0.25); g2.lineTo(W, H * 0.25); g2.moveTo(0, H * 0.7); g2.lineTo(W, H * 0.7); g2.stroke();
+    const n = 1600, s0 = (scopeW - n + 2048) & 2047;
+    let mx = 1e-4; for (let i = 0; i < n; i++) mx = Math.max(mx, Math.abs(scopeP[(s0 + i) & 2047]));
+    g2.strokeStyle = '#ffb03a'; g2.lineWidth = 2; g2.beginPath();
+    for (let i = 0; i < n; i++) { const x = i * W / n, y = H * 0.25 - scopeBit[(s0 + i) & 2047] * H * 0.17; i ? g2.lineTo(x, y) : g2.moveTo(x, y); } g2.stroke();
+    g2.strokeStyle = '#59e07a'; g2.beginPath();
+    for (let i = 0; i < n; i++) { const x = i * W / n, y = H * 0.7 - scopeP[(s0 + i) & 2047] / Math.max(mx, 0.05) * H * 0.26; i ? g2.lineTo(x, y) : g2.moveTo(x, y); } g2.stroke();
+    g2.fillStyle = '#7d8a99'; g2.font = '22px ui-monospace,monospace'; g2.fillText('chip OUT−OUT̄ (1-bit)', 12, 28); g2.fillText('sound pressure (speaker model)', 12, H * 0.47);
+    const st = state || {};
+    const on = st.prog >= 0; led.classList.toggle('on', on);
+    if (on) {
+      const f = st.K * (1 + params.sagAmt * st.sag) / st.N;
+      nowEl.textContent = `#${st.prog + 1} ${DESC[st.prog][0].padEnd(12)} ${st.mode === 1 ? 'TONE  N=' + String(st.N).padStart(3) + '  f≈' + f.toFixed(0).padStart(4) + ' Hz' : st.mode === 2 ? 'NOISE LFSR clock ÷' + st.N + ' ≈' + (f / 1000).toFixed(1) + ' kHz' : 'rest'}\nbattery sag ${(st.sag * 100).toFixed(0).padStart(3)}%   osc ≈ ${(st.K * 4 * (1 + params.sagAmt * st.sag) / 1000).toFixed(1)} kHz`;
+    } else nowEl.textContent = 'idle';
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>

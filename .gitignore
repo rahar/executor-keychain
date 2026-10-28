@@ -1,0 +1,14 @@
+# Python env
+.venv/
+__pycache__/
+
+# Third-party material, not ours to redistribute:
+# the original Threads/Instagram video, its audio, cut segments, frames,
+# the CDN URL list (signed tokens) and the Holtek datasheet (linked in README).
+post.mp4
+post.wav
+urls.txt
+frames.jpg
+seg/*.wav
+seg/*.jpg
+ht2884.pdf
